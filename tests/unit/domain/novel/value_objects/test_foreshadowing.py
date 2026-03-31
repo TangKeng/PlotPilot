@@ -226,3 +226,97 @@ def test_foreshadowing_different_importance_levels():
     assert high.importance == ImportanceLevel.HIGH
     assert critical.importance == ImportanceLevel.CRITICAL
     assert low.importance < medium.importance < high.importance < critical.importance
+
+
+def test_suggested_resolve_chapter_validation():
+    """测试 suggested_resolve_chapter 验证"""
+    with pytest.raises(ValueError, match="suggested_resolve_chapter must be >= 1"):
+        Foreshadowing(
+            id="fh-018",
+            planted_in_chapter=1,
+            description="无效建议章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.PLANTED,
+            suggested_resolve_chapter=0
+        )
+
+    with pytest.raises(ValueError, match="suggested_resolve_chapter must be >= 1"):
+        Foreshadowing(
+            id="fh-019",
+            planted_in_chapter=1,
+            description="负数建议章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.PLANTED,
+            suggested_resolve_chapter=-1
+        )
+
+
+def test_resolved_in_chapter_validation():
+    """测试 resolved_in_chapter 验证"""
+    with pytest.raises(ValueError, match="resolved_in_chapter must be >= 1"):
+        Foreshadowing(
+            id="fh-020",
+            planted_in_chapter=1,
+            description="无效解决章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.RESOLVED,
+            resolved_in_chapter=0
+        )
+
+    with pytest.raises(ValueError, match="resolved_in_chapter must be >= 1"):
+        Foreshadowing(
+            id="fh-021",
+            planted_in_chapter=1,
+            description="负数解决章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.RESOLVED,
+            resolved_in_chapter=-1
+        )
+
+
+def test_resolved_in_chapter_business_rule():
+    """测试 resolved_in_chapter 必须 >= planted_in_chapter"""
+    with pytest.raises(ValueError, match="resolved_in_chapter must be >= planted_in_chapter"):
+        Foreshadowing(
+            id="fh-022",
+            planted_in_chapter=5,
+            description="解决章节早于埋下章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.RESOLVED,
+            resolved_in_chapter=3
+        )
+
+    # 同一章节解决应该可以
+    foreshadowing = Foreshadowing(
+        id="fh-023",
+        planted_in_chapter=5,
+        description="同章节解决",
+        importance=ImportanceLevel.LOW,
+        status=ForeshadowingStatus.RESOLVED,
+        resolved_in_chapter=5
+    )
+    assert foreshadowing.resolved_in_chapter == 5
+
+
+def test_suggested_resolve_chapter_business_rule():
+    """测试 suggested_resolve_chapter 必须 >= planted_in_chapter"""
+    with pytest.raises(ValueError, match="suggested_resolve_chapter must be >= planted_in_chapter"):
+        Foreshadowing(
+            id="fh-024",
+            planted_in_chapter=5,
+            description="建议章节早于埋下章节",
+            importance=ImportanceLevel.LOW,
+            status=ForeshadowingStatus.PLANTED,
+            suggested_resolve_chapter=3
+        )
+
+    # 同一章节建议应该可以
+    foreshadowing = Foreshadowing(
+        id="fh-025",
+        planted_in_chapter=5,
+        description="同章节建议",
+        importance=ImportanceLevel.LOW,
+        status=ForeshadowingStatus.PLANTED,
+        suggested_resolve_chapter=5
+    )
+    assert foreshadowing.suggested_resolve_chapter == 5

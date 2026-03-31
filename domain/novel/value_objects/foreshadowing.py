@@ -36,3 +36,15 @@ class Foreshadowing:
             raise ValueError("description cannot be empty")
         if self.status == ForeshadowingStatus.RESOLVED and self.resolved_in_chapter is None:
             raise ValueError("RESOLVED status requires resolved_in_chapter")
+
+        # Validate optional chapter fields
+        if self.suggested_resolve_chapter is not None and self.suggested_resolve_chapter < 1:
+            raise ValueError("suggested_resolve_chapter must be >= 1")
+        if self.resolved_in_chapter is not None and self.resolved_in_chapter < 1:
+            raise ValueError("resolved_in_chapter must be >= 1")
+
+        # Validate business rules
+        if self.resolved_in_chapter is not None and self.resolved_in_chapter < self.planted_in_chapter:
+            raise ValueError("resolved_in_chapter must be >= planted_in_chapter")
+        if self.suggested_resolve_chapter is not None and self.suggested_resolve_chapter < self.planted_in_chapter:
+            raise ValueError("suggested_resolve_chapter must be >= planted_in_chapter")
