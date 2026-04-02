@@ -210,8 +210,8 @@
       </n-tab-pane>
     </n-tabs>
 
-    <CastGraphCompact v-show="sideTab === 'graph'" :slug="slug" class="kp-graph-embed" />
-    <KnowledgeBase v-show="sideTab === 'knowledge'" :slug="slug" class="kp-graph-embed" />
+    <CastGraphCompact v-if="sideTab === 'graph'" :slug="slug" class="kp-graph-embed" />
+    <KnowledgeBase v-if="sideTab === 'knowledge'" :slug="slug" class="kp-graph-embed" />
   </div>
 </template>
 
