@@ -11,6 +11,8 @@ from application.dtos.generation_result import GenerationResult
 from domain.novel.services.consistency_checker import ConsistencyChecker
 from domain.novel.services.storyline_manager import StorylineManager
 from domain.novel.repositories.plot_arc_repository import PlotArcRepository
+from domain.bible.repositories.bible_repository import BibleRepository
+from domain.novel.repositories.foreshadowing_repository import ForeshadowingRepository
 from domain.novel.value_objects.consistency_report import ConsistencyReport
 from domain.novel.value_objects.chapter_state import ChapterState
 from domain.novel.value_objects.consistency_context import ConsistencyContext
@@ -65,7 +67,9 @@ class AutoNovelGenerationWorkflow:
         plot_arc_repository: PlotArcRepository,
         llm_service: LLMService,
         state_extractor: Optional[StateExtractor] = None,
-        state_updater: Optional[StateUpdater] = None
+        state_updater: Optional[StateUpdater] = None,
+        bible_repository: Optional[BibleRepository] = None,
+        foreshadowing_repository: Optional[ForeshadowingRepository] = None
     ):
         """初始化工作流
 
@@ -77,6 +81,8 @@ class AutoNovelGenerationWorkflow:
             llm_service: LLM 服务
             state_extractor: 状态提取器（可选）
             state_updater: 状态更新器（可选）
+            bible_repository: Bible 仓储（用于一致性检查，可选）
+            foreshadowing_repository: Foreshadowing 仓储（用于一致性检查，可选）
         """
         self.context_builder = context_builder
         self.consistency_checker = consistency_checker
@@ -85,6 +91,8 @@ class AutoNovelGenerationWorkflow:
         self.llm_service = llm_service
         self.state_extractor = state_extractor
         self.state_updater = state_updater
+        self.bible_repository = bible_repository
+        self.foreshadowing_repository = foreshadowing_repository
 
     async def generate_chapter(
         self,
@@ -424,38 +432,39 @@ class AutoNovelGenerationWorkflow:
         Returns:
             ConsistencyReport
         """
+        from domain.bible.entities.bible import Bible
+        from domain.bible.entities.character_registry import CharacterRegistry
+        from domain.novel.entities.foreshadowing_registry import ForeshadowingRegistry
+        from domain.novel.entities.plot_arc import PlotArc
+        from domain.novel.value_objects.event_timeline import EventTimeline
+        from domain.bible.value_objects.relationship_graph import RelationshipGraph
+
+        novel_id_obj = NovelId(novel_id)
+
         try:
-            # 直接调用 consistency_checker，让它处理上下文
-            # 在实际使用中，应该从仓储获取完整的上下文对象
-            # 在测试中，consistency_checker 会被 mock
+            # 尝试从仓储加载真实数据
+            if self.bible_repository:
+                bible = self.bible_repository.get_by_novel_id(novel_id_obj)
+                logger.debug(f"Loaded real Bible for consistency check: {bible is not None}")
+            else:
+                bible = None
 
-            # 尝试创建一个最小化的上下文
-            # 如果失败，返回空报告
-            from domain.bible.entities.bible import Bible
-            from domain.bible.entities.character_registry import CharacterRegistry
-            from domain.novel.entities.foreshadowing_registry import ForeshadowingRegistry
-            from domain.novel.entities.plot_arc import PlotArc
-            from domain.novel.value_objects.event_timeline import EventTimeline
-            from domain.bible.value_objects.relationship_graph import RelationshipGraph
+            if self.foreshadowing_repository:
+                foreshadowing_registry = self.foreshadowing_repository.get_by_novel_id(novel_id_obj)
+                logger.debug(f"Loaded real ForeshadowingRegistry for consistency check: {foreshadowing_registry is not None}")
+            else:
+                foreshadowing_registry = None
 
-            # 创建最小化的上下文用于检查
             context = ConsistencyContext(
-                bible=Bible(id="temp", novel_id=NovelId(novel_id)),
+                bible=bible or Bible(id="temp", novel_id=novel_id_obj),
                 character_registry=CharacterRegistry(id="temp"),
-                foreshadowing_registry=ForeshadowingRegistry(id="temp", novel_id=NovelId(novel_id)),
-                plot_arc=PlotArc(id="temp", novel_id=NovelId(novel_id)),
+                foreshadowing_registry=foreshadowing_registry or ForeshadowingRegistry(id="temp", novel_id=novel_id_obj),
+                plot_arc=PlotArc(id="temp", novel_id=novel_id_obj),
                 event_timeline=EventTimeline(events=[]),
                 relationship_graph=RelationshipGraph()
             )
 
-            # 调用一致性检查器
             return self.consistency_checker.check_all(chapter_state, context)
         except Exception as e:
             logger.warning(f"Consistency check failed: {e}")
-            # 如果创建上下文失败，尝试直接调用 mock（用于测试）
-            try:
-                # 这会在测试中工作，因为 mock 不需要真实的上下文
-                return self.consistency_checker.check_all(chapter_state, None)
-            except:
-                # 返回空报告
-                return ConsistencyReport(issues=[], warnings=[], suggestions=[])
+            return ConsistencyReport(issues=[], warnings=[], suggestions=[])

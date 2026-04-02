@@ -6,8 +6,13 @@ import logging
 
 from application.services.novel_service import NovelService
 from application.services.auto_bible_generator import AutoBibleGenerator
+from application.services.auto_knowledge_generator import AutoKnowledgeGenerator
 from application.dtos.novel_dto import NovelDTO
-from interfaces.api.dependencies import get_novel_service, get_auto_bible_generator
+from interfaces.api.dependencies import (
+    get_novel_service,
+    get_auto_bible_generator,
+    get_auto_knowledge_generator
+)
 from domain.shared.exceptions import EntityNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -34,14 +39,16 @@ class UpdateStageRequest(BaseModel):
 async def create_novel(
     request: CreateNovelRequest,
     service: NovelService = Depends(get_novel_service),
-    bible_generator: AutoBibleGenerator = Depends(get_auto_bible_generator)
+    bible_generator: AutoBibleGenerator = Depends(get_auto_bible_generator),
+    knowledge_generator: AutoKnowledgeGenerator = Depends(get_auto_knowledge_generator)
 ):
-    """创建新小说并自动生成 Bible
+    """创建新小说并自动生成 Bible 和初始 Knowledge
 
     Args:
         request: 创建小说请求
         service: Novel 服务
         bible_generator: Bible 生成器
+        knowledge_generator: Knowledge 生成器
 
     Returns:
         创建的小说 DTO
@@ -55,15 +62,31 @@ async def create_novel(
     )
 
     # 同步生成 Bible（用户需要等待，确保 Bible 可用）
+    bible_summary = ""
     try:
-        await bible_generator.generate_and_save(
+        bible_data = await bible_generator.generate_and_save(
             request.novel_id,
             request.title,
             request.target_chapters
         )
+        # 构建 Bible 摘要供 Knowledge 生成使用
+        chars = bible_data.get("characters", [])
+        locs = bible_data.get("locations", [])
+        char_desc = "、".join(f"{c['name']}（{c.get('role', '')}）" for c in chars[:5])
+        loc_desc = "、".join(c['name'] for c in locs[:3])
+        bible_summary = f"主要角色：{char_desc}。重要地点：{loc_desc}。文风：{bible_data.get('style', '')}。"
     except Exception as e:
-        # Bible 生成失败不影响小说创建
         logger.error(f"Failed to generate Bible for {request.novel_id}: {e}")
+
+    # 生成初始 Knowledge（不阻塞，失败不影响小说创建）
+    try:
+        await knowledge_generator.generate_and_save(
+            request.novel_id,
+            request.title,
+            bible_summary
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate Knowledge for {request.novel_id}: {e}")
 
     return novel_dto
 

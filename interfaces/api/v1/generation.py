@@ -25,7 +25,11 @@ from interfaces.api.dependencies import (
     get_bible_service,
     get_novel_service,
     get_chapter_service,
+    get_auto_bible_generator,
+    get_auto_knowledge_generator,
 )
+from application.services.auto_bible_generator import AutoBibleGenerator
+from application.services.auto_knowledge_generator import AutoKnowledgeGenerator
 
 router = APIRouter(prefix="/novels", tags=["generation"])
 
@@ -660,3 +664,123 @@ async def extend_outline(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Extend outline failed: {str(e)}"
         )
+
+
+# ============================================================================
+# Bible / Knowledge 一键 AI 生成（补齐旧小说数据）
+# ============================================================================
+
+class GenerateBibleResponse(BaseModel):
+    success: bool
+    message: str
+    characters_count: int = 0
+    locations_count: int = 0
+
+
+class GenerateKnowledgeResponse(BaseModel):
+    success: bool
+    message: str
+    facts_count: int = 0
+    premise_lock: str = ""
+
+
+@router.post(
+    "/{novel_id}/bible/generate",
+    response_model=GenerateBibleResponse,
+    status_code=status.HTTP_200_OK,
+    summary="AI 生成 Bible 设定"
+)
+async def generate_bible(
+    novel_id: str,
+    bible_generator: AutoBibleGenerator = Depends(get_auto_bible_generator),
+    novel_service=Depends(get_novel_service),
+):
+    """为指定小说 AI 生成（或重新生成）Bible 设定。
+
+    - 会覆盖现有 Bible 中的角色、地点与文风数据
+    - 需要 ANTHROPIC_API_KEY
+    """
+    try:
+        novel = novel_service.get_novel(novel_id)
+        if not novel:
+            raise HTTPException(status_code=404, detail=f"Novel not found: {novel_id}")
+
+        bible_data = await bible_generator.generate_and_save(
+            novel_id=novel_id,
+            title=novel.title,
+            target_chapters=novel.target_chapters,
+        )
+
+        chars = bible_data.get("characters", [])
+        locs = bible_data.get("locations", [])
+        return GenerateBibleResponse(
+            success=True,
+            message=f"Bible 生成成功：{len(chars)} 位角色，{len(locs)} 个地点",
+            characters_count=len(chars),
+            locations_count=len(locs),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("generate_bible failed for %s", novel_id)
+        raise HTTPException(status_code=500, detail=f"Bible 生成失败：{str(e)}")
+
+
+@router.post(
+    "/{novel_id}/knowledge/generate",
+    response_model=GenerateKnowledgeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="AI 生成初始 Knowledge 知识图谱"
+)
+async def generate_knowledge(
+    novel_id: str,
+    knowledge_generator: AutoKnowledgeGenerator = Depends(get_auto_knowledge_generator),
+    novel_service=Depends(get_novel_service),
+    bible_service=Depends(get_bible_service),
+):
+    """为指定小说 AI 生成初始 Knowledge（梗概锁定 + 知识三元组）。
+
+    - 会读取已有 Bible 作为参考
+    - 需要 ANTHROPIC_API_KEY
+    """
+    try:
+        novel = novel_service.get_novel(novel_id)
+        if not novel:
+            raise HTTPException(status_code=404, detail=f"Novel not found: {novel_id}")
+
+        # 尝试读取 Bible 摘要作为生成参考
+        bible_summary = ""
+        try:
+            bible = bible_service.get_bible_by_novel(novel_id)
+            if bible and bible.characters:
+                char_desc = "、".join(
+                    f"{c.name}" for c in list(bible.characters)[:5]
+                )
+                bible_summary = f"主要角色：{char_desc}。"
+                if bible.locations:
+                    loc_desc = "、".join(l.name for l in list(bible.locations)[:3])
+                    bible_summary += f"重要地点：{loc_desc}。"
+                if bible.style_notes:
+                    bible_summary += f"文风：{list(bible.style_notes)[0].content[:80]}。"
+        except Exception:
+            pass
+
+        knowledge_data = await knowledge_generator.generate_and_save(
+            novel_id=novel_id,
+            title=novel.title,
+            bible_summary=bible_summary,
+        )
+
+        facts_count = len(knowledge_data.get("facts", []))
+        premise = knowledge_data.get("premise_lock", "")
+        return GenerateKnowledgeResponse(
+            success=True,
+            message=f"Knowledge 生成成功：梗概锁定已写入，{facts_count} 条知识三元组",
+            facts_count=facts_count,
+            premise_lock=premise[:120] + ("…" if len(premise) > 120 else ""),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("generate_knowledge failed for %s", novel_id)
+        raise HTTPException(status_code=500, detail=f"Knowledge 生成失败：{str(e)}")

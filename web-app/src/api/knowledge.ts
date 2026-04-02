@@ -68,4 +68,15 @@ export const knowledgeApi = {
     request.get(`/novels/${novelId}/knowledge/search`, {
       params: { q: query, k }
     }) as Promise<KnowledgeSearchResponse>,
+
+  /**
+   * AI generate (or regenerate) initial Knowledge for a novel
+   * POST /api/v1/novels/{novelId}/knowledge/generate
+   */
+  generateKnowledge: (novelId: string) =>
+    request.post<{ success: boolean; message: string; facts_count: number; premise_lock: string }>(
+      `/novels/${novelId}/knowledge/generate`,
+      {},
+      { timeout: 120_000 }
+    ) as Promise<{ success: boolean; message: string; facts_count: number; premise_lock: string }>,
 }

@@ -107,4 +107,15 @@ export const bibleApi = {
     }
   ) =>
     apiClient.put<BibleDTO>(`/bible/novels/${novelId}/bible`, data) as Promise<BibleDTO>,
+
+  /**
+   * AI generate (or regenerate) Bible for a novel
+   * POST /api/v1/novels/{novelId}/bible/generate
+   */
+  generateBible: (novelId: string) =>
+    apiClient.post<{ success: boolean; message: string; characters_count: number; locations_count: number }>(
+      `/novels/${novelId}/bible/generate`,
+      {},
+      { timeout: 120_000 }
+    ) as Promise<{ success: boolean; message: string; characters_count: number; locations_count: number }>,
 }

@@ -9,16 +9,26 @@
           <strong>manifest</strong> 为准。
         </p>
       </div>
-      <n-button
-        v-show="sideTab === 'narrative'"
-        type="primary"
-        size="small"
-        :loading="saving"
-        round
-        @click="save"
-      >
-        保存到全书上下文
-      </n-button>
+      <n-space v-show="sideTab === 'narrative'" :size="8" align="center" style="flex-shrink:0">
+        <n-button
+          size="small"
+          secondary
+          :loading="generating"
+          @click="generateKnowledge"
+          title="用 AI 根据 Bible 生成初始梗概锁定和知识三元组"
+        >
+          ✦ AI 生成
+        </n-button>
+        <n-button
+          type="primary"
+          size="small"
+          :loading="saving"
+          round
+          @click="save"
+        >
+          保存到全书上下文
+        </n-button>
+      </n-space>
     </header>
 
     <n-radio-group v-model:value="sideTab" class="kp-seg" size="small">
@@ -247,6 +257,7 @@ import { knowledgeApi } from '../api/knowledge'
 import CastGraphCompact from './CastGraphCompact.vue'
 import KnowledgeTripleGraph from './KnowledgeTripleGraph.vue'
 
+
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
 const message = useMessage()
@@ -278,6 +289,7 @@ const data = ref({
 })
 
 const saving = ref(false)
+const generating = ref(false)
 const sideTab = ref<'narrative' | 'graph' | 'triple'>('narrative')
 const subTab = ref<'search' | 'premise' | 'chapters' | 'facts'>('search')
 const outlineTitles = ref<Record<number, string>>({})
@@ -390,6 +402,20 @@ const save = async () => {
     message.error(e?.response?.data?.detail || '保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+const generateKnowledge = async () => {
+  generating.value = true
+  try {
+    const res = await knowledgeApi.generateKnowledge(props.slug)
+    message.success(res.message || 'Knowledge 生成成功')
+    await load()
+    subTab.value = 'premise'
+  } catch (e: any) {
+    message.error(e?.response?.data?.detail || 'AI 生成失败，请确认 API Key 已配置')
+  } finally {
+    generating.value = false
   }
 }
 

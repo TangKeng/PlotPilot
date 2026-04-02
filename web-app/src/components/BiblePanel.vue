@@ -43,6 +43,9 @@
         <n-button size="small" quaternary @click="showJson = !showJson">
           {{ showJson ? '返回表单' : '高级 · JSON' }}
         </n-button>
+        <n-button size="small" secondary :loading="generating" @click="generateBible" title="用 AI 根据小说标题重新生成设定">
+          ✦ AI 生成
+        </n-button>
         <n-button size="small" type="primary" :loading="saving" @click="save">保存设定</n-button>
       </n-space>
     </header>
@@ -196,6 +199,8 @@ import { useMessage } from 'naive-ui'
 import { bibleApi } from '../api/bible'
 import type { CharacterDTO, LocationDTO, TimelineNoteDTO, StyleNoteDTO } from '../api/bible'
 
+
+
 const props = defineProps<{ slug: string }>()
 const message = useMessage()
 
@@ -221,6 +226,7 @@ const state = ref(emptyState())
 const jsonRaw = ref('')
 const showJson = ref(false)
 const saving = ref(false)
+const generating = ref(false)
 
 const stats = computed(() => {
   const namedChars = state.value.characters.filter(c => (c.name || '').trim()).length
@@ -366,6 +372,19 @@ const save = async () => {
     }
   } finally {
     saving.value = false
+  }
+}
+
+const generateBible = async () => {
+  generating.value = true
+  try {
+    const res = await bibleApi.generateBible(props.slug)
+    message.success(res.message || 'Bible 生成成功')
+    await load()
+  } catch (e: any) {
+    message.error(e?.response?.data?.detail || 'AI 生成失败，请确认 API Key 已配置')
+  } finally {
+    generating.value = false
   }
 }
 

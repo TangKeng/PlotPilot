@@ -31,6 +31,7 @@ from application.services.knowledge_service import KnowledgeService
 from application.services.chat_service import ChatService
 from application.services.context_builder import ContextBuilder
 from application.services.auto_bible_generator import AutoBibleGenerator
+from application.services.auto_knowledge_generator import AutoKnowledgeGenerator
 from application.services.state_extractor import StateExtractor
 from application.services.state_updater import StateUpdater
 from application.workflows.auto_novel_generation_workflow import AutoNovelGenerationWorkflow
@@ -338,7 +339,9 @@ def get_auto_workflow() -> AutoNovelGenerationWorkflow:
         plot_arc_repository=get_plot_arc_repository(),
         llm_service=llm_service,
         state_extractor=get_state_extractor(),
-        state_updater=get_state_updater()
+        state_updater=get_state_updater(),
+        bible_repository=get_bible_repository(),
+        foreshadowing_repository=get_foreshadowing_repository()
     )
 
 
@@ -368,6 +371,20 @@ def get_state_extractor() -> StateExtractor:
     return StateExtractor(llm_service=llm_service)
 
 
+def get_auto_knowledge_generator() -> AutoKnowledgeGenerator:
+    """获取自动 Knowledge 生成器
+
+    Returns:
+        AutoKnowledgeGenerator 实例
+    """
+    settings = _anthropic_settings(require_key=True)
+    llm_service = AnthropicProvider(settings)
+    return AutoKnowledgeGenerator(
+        llm_service=llm_service,
+        knowledge_service=get_knowledge_service()
+    )
+
+
 def get_state_updater() -> StateUpdater:
     """获取状态更新器
 
@@ -376,5 +393,6 @@ def get_state_updater() -> StateUpdater:
     """
     return StateUpdater(
         bible_repository=get_bible_repository(),
-        foreshadowing_repository=get_foreshadowing_repository()
+        foreshadowing_repository=get_foreshadowing_repository(),
+        knowledge_service=get_knowledge_service()
     )
