@@ -145,6 +145,16 @@
       </section>
     </div>
     </div>
+
+    <!-- Setup Guide Modal -->
+    <NovelSetupGuide
+      v-if="newNovelId"
+      :novel-id="newNovelId"
+      :show="showSetupGuide"
+      @update:show="showSetupGuide = $event"
+      @complete="handleSetupComplete"
+      @skip="handleSetupSkip"
+    />
   </div>
 </template>
 
@@ -154,6 +164,7 @@ import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { novelApi, type NovelDTO } from '../api/novel'
 import StatsSidebar from '@/components/stats/StatsSidebar.vue'
+import NovelSetupGuide from '@/components/onboarding/NovelSetupGuide.vue'
 
 const IconSpark = () =>
   h(
@@ -194,6 +205,8 @@ const loading = ref(false)
 const books = ref<any[]>([])
 const searchQuery = ref('')
 const deletingSlug = ref<string | null>(null)
+const showSetupGuide = ref(false)
+const newNovelId = ref('')
 
 const newBook = ref({
   title: '',
@@ -277,12 +290,23 @@ const handleCreate = async () => {
 
     const result = await novelApi.createNovel(payload)
     message.success('创建成功')
-    router.push(`/book/${result.id}/workbench`)
+
+    // Show setup guide instead of navigating directly
+    newNovelId.value = result.id
+    showSetupGuide.value = true
   } catch (error: any) {
     message.error(error.response?.data?.detail || '创建失败')
   } finally {
     creating.value = false
   }
+}
+
+const handleSetupComplete = () => {
+  router.push(`/book/${newNovelId.value}/workbench`)
+}
+
+const handleSetupSkip = () => {
+  router.push(`/book/${newNovelId.value}/workbench`)
 }
 
 const navigateToBook = (slug: string) => {

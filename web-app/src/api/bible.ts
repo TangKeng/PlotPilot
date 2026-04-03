@@ -110,12 +110,20 @@ export const bibleApi = {
 
   /**
    * AI generate (or regenerate) Bible for a novel
-   * POST /api/v1/novels/{novelId}/bible/generate
+   * POST /api/v1/bible/novels/{novelId}/generate
    */
   generateBible: (novelId: string) =>
-    apiClient.post<{ success: boolean; message: string; characters_count: number; locations_count: number }>(
-      `/novels/${novelId}/bible/generate`,
-      {},
-      { timeout: 120_000 }
-    ) as Promise<{ success: boolean; message: string; characters_count: number; locations_count: number }>,
+    apiClient.post<{ message: string; novel_id: string; status_url: string }>(
+      `/bible/novels/${novelId}/generate`,
+      {}
+    ) as Promise<{ message: string; novel_id: string; status_url: string }>,
+
+  /**
+   * Check Bible generation status
+   * GET /api/v1/bible/novels/{novelId}/bible/status
+   */
+  getBibleStatus: (novelId: string) =>
+    apiClient.get<{ exists: boolean; ready: boolean; novel_id: string }>(
+      `/bible/novels/${novelId}/bible/status`
+    ) as Promise<{ exists: boolean; ready: boolean; novel_id: string }>,
 }
