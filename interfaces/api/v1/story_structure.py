@@ -85,7 +85,7 @@ async def get_structure_tree(
 ):
     """获取小说的完整结构树"""
     try:
-        return service.get_tree(novel_id)
+        return await service.get_tree(novel_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -100,7 +100,7 @@ async def get_children(
     try:
         return {
             "parent_id": parent_id,
-            "children": service.get_children(novel_id, parent_id)
+            "children": await service.get_children(novel_id, parent_id)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -114,7 +114,7 @@ async def create_node(
 ):
     """创建节点"""
     try:
-        node = service.create_node(
+        node = await service.create_node(
             novel_id=novel_id,
             node_type=request.node_type,
             number=request.number,
@@ -139,7 +139,7 @@ async def update_node(
 ):
     """更新节点"""
     try:
-        node = service.update_node(
+        node = await service.update_node(
             node_id=node_id,
             title=request.title,
             description=request.description,
@@ -160,7 +160,7 @@ async def delete_node(
 ):
     """删除节点"""
     try:
-        success = service.delete_node(node_id)
+        success = await service.delete_node(node_id)
         if not success:
             raise HTTPException(status_code=404, detail="Node not found")
         return {"success": True}
@@ -176,7 +176,7 @@ async def reorder_nodes(
 ):
     """重新排序节点"""
     try:
-        nodes = service.reorder_nodes(request.node_ids)
+        nodes = await service.reorder_nodes(request.node_ids)
         return {"success": True, "nodes": nodes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -189,7 +189,7 @@ async def update_chapter_ranges(
 ):
     """更新章节范围"""
     try:
-        service.update_chapter_ranges(novel_id)
+        await service.update_chapter_ranges(novel_id)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -203,7 +203,7 @@ async def create_default_structure(
 ):
     """创建默认结构"""
     try:
-        result = service.create_default_structure(novel_id, total_chapters)
+        result = await service.create_default_structure(novel_id, total_chapters)
         return {"success": True, "structure": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

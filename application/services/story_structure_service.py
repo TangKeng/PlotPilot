@@ -15,20 +15,20 @@ class StoryStructureService:
     def __init__(self, repository: StoryNodeRepository):
         self.repository = repository
 
-    def get_tree(self, novel_id: str) -> Dict[str, Any]:
+    async def get_tree(self, novel_id: str) -> Dict[str, Any]:
         """获取小说的完整结构树"""
-        tree = self.repository.get_tree(novel_id)
+        tree = await self.repository.get_tree(novel_id)
         return {
             "novel_id": novel_id,
             "tree": tree.to_tree_dict()
         }
 
-    def get_children(self, novel_id: str, parent_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_children(self, novel_id: str, parent_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """获取子节点（用于渐进式加载）"""
-        nodes = self.repository.get_children(parent_id, novel_id)
+        nodes = await self.repository.get_children(parent_id)
         return [node.to_dict() for node in nodes]
 
-    def create_node(
+    async def create_node(
         self,
         novel_id: str,
         node_type: str,
@@ -47,7 +47,7 @@ class StoryStructureService:
 
         # 如果未指定 order_index，自动计算
         if order_index is None:
-            siblings = self.repository.get_children(parent_id, novel_id)
+            siblings = await self.repository.get_children(parent_id)
             order_index = len(siblings)
 
         # 创建节点
@@ -62,10 +62,10 @@ class StoryStructureService:
             order_index=order_index
         )
 
-        saved_node = self.repository.save(node)
+        saved_node = await self.repository.save(node)
         return saved_node.to_dict()
 
-    def update_node(
+    async def update_node(
         self,
         node_id: str,
         title: Optional[str] = None,
@@ -73,7 +73,7 @@ class StoryStructureService:
         number: Optional[int] = None
     ) -> Dict[str, Any]:
         """更新节点"""
-        node = self.repository.get_by_id(node_id)
+        node = await self.repository.get_by_id(node_id)
         if not node:
             raise ValueError(f"Node not found: {node_id}")
 
@@ -84,30 +84,30 @@ class StoryStructureService:
         if number is not None:
             node.number = number
 
-        saved_node = self.repository.save(node)
+        saved_node = await self.repository.save(node)
         return saved_node.to_dict()
 
-    def delete_node(self, node_id: str) -> bool:
+    async def delete_node(self, node_id: str) -> bool:
         """删除节点"""
-        return self.repository.delete(node_id)
+        return await self.repository.delete(node_id)
 
-    def reorder_nodes(self, node_ids: List[str]) -> List[Dict[str, Any]]:
+    async def reorder_nodes(self, node_ids: List[str]) -> List[Dict[str, Any]]:
         """重新排序节点"""
         nodes = []
         for idx, node_id in enumerate(node_ids):
-            node = self.repository.get_by_id(node_id)
+            node = await self.repository.get_by_id(node_id)
             if node:
                 node.order_index = idx
                 nodes.append(node)
 
-        saved_nodes = self.repository.save_batch(nodes)
+        saved_nodes = await self.repository.save_batch(nodes)
         return [node.to_dict() for node in saved_nodes]
 
-    def update_chapter_ranges(self, novel_id: str):
+    async def update_chapter_ranges(self, novel_id: str):
         """更新章节范围"""
-        self.repository.update_chapter_ranges(novel_id)
+        await self.repository.update_chapter_ranges(novel_id)
 
-    def create_default_structure(self, novel_id: str, total_chapters: int = 100) -> Dict[str, Any]:
+    async def create_default_structure(self, novel_id: str, total_chapters: int = 100) -> Dict[str, Any]:
         """创建默认结构（示例：3部，每部3卷，每卷若干幕）"""
         nodes = []
         order_idx = 0
@@ -176,9 +176,9 @@ class StoryStructureService:
                 break
 
         # 批量保存
-        self.repository.save_batch(nodes)
+        await self.repository.save_batch(nodes)
 
         # 更新章节范围
-        self.update_chapter_ranges(novel_id)
+        await self.update_chapter_ranges(novel_id)
 
-        return self.get_tree(novel_id)
+        return await self.get_tree(novel_id)
