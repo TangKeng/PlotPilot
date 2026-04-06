@@ -1,5 +1,6 @@
 """向量检索门面，隔离异步调用"""
 import asyncio
+import concurrent.futures
 from typing import List, Optional
 
 from domain.ai.services.vector_store import VectorStore
@@ -36,17 +37,18 @@ class VectorRetrievalFacade:
         Returns:
             相似向量列表，每个元素包含 id, score, payload
         """
-        # 获取或创建事件循环
+        # 若在已有事件循环内（如 FastAPI / AutopilotDaemon asyncio.run 链），
+        # run_until_complete 会报错 "This event loop is already running" 并阻塞同线程其它任务。
         try:
-            loop = asyncio.get_event_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            return asyncio.run(self._async_search(collection, query_text, limit))
 
-        # 运行异步搜索
-        return loop.run_until_complete(
-            self._async_search(collection, query_text, limit)
-        )
+        def _run_in_fresh_loop() -> List[dict]:
+            return asyncio.run(self._async_search(collection, query_text, limit))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(_run_in_fresh_loop).result()
 
     async def _async_search(
         self,

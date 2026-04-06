@@ -233,6 +233,9 @@ class DatabaseConnection:
             self._connection.row_factory = sqlite3.Row
             # 启用外键约束
             self._connection.execute("PRAGMA foreign_keys = ON")
+            # 守护进程写章节时 API 仍可读，减少「整库锁」体感阻塞
+            self._connection.execute("PRAGMA journal_mode=WAL")
+            self._connection.execute("PRAGMA busy_timeout=5000")
         return self._connection
 
     @contextmanager
